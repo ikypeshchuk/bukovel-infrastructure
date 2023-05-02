@@ -38,7 +38,6 @@ data "digitalocean_loadbalancer" "lb-k8s" {
   depends_on = [module.kubernetes_resources]
   name       = "ingress-nginx-lb"
 }
-
 output "do_ip" {
   value = data.digitalocean_loadbalancer.lb-k8s.ip
 }
@@ -70,7 +69,6 @@ module "kubernetes" {
   vpc_uuid              = module.vpc[0].vpc_id
   depends_on            = [module.vpc, module.container_registry]
 }
-
 module "loadbalancer_letsencrypt_certificate" {
   count            = var.enabled_modules["loadbalancer_letsencrypt_certificate"] ? 1 : 0
   source           = "./modules/letsencrypt_certificate"
