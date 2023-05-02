@@ -5,10 +5,11 @@ resource "digitalocean_kubernetes_cluster" "production" {
   vpc_uuid = var.vpc_uuid
 
   node_pool {
-    name      = var.node_pool_name
-    size      = var.node_size
-    min_nodes = var.min_node_count
-    max_nodes = var.max_node_count
+    name       = var.node_pool_name
+    size       = var.node_size
+    auto_scale = true
+    min_nodes  = var.min_node_count
+    max_nodes  = var.max_node_count
   }
   registry_integration = var.registry_integration
 }

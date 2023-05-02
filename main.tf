@@ -5,60 +5,136 @@ terraform {
       source  = "digitalocean/digitalocean"
       version = ">= 2.0.0"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = ">= 2.5.0"
+    }
   }
 }
-
 provider "digitalocean" {
   token = var.do_token
 }
+provider "kubernetes" {
+  config_path = local_file.kubeconfig.filename
+}
+resource "local_file" "kubeconfig" {
+  content    = module.kubernetes[0].kubeconfig_raw
+  filename   = "${path.module}/kubeconfig.yaml"
+  depends_on = [module.kubernetes]
+}
+resource "time_sleep" "wait_for_load_balancer" {
+  depends_on = [module.kubernetes_resources.ingress_nginx_lb]
 
+  create_duration = "5m" # Adjust the duration as needed
+}
+resource "null_resource" "cluster_dependency" {
+  depends_on = [module.kubernetes]
+}
+resource "time_sleep" "wait_for_cluster" {
+  depends_on      = [module.kubernetes]
+  create_duration = "5m" # Adjust the duration as needed
+}
+data "digitalocean_loadbalancer" "lb-k8s" {
+  depends_on = [module.kubernetes_resources]
+  name       = "ingress-nginx-lb"
+}
+
+output "do_ip" {
+  value = data.digitalocean_loadbalancer.lb-k8s.ip
+}
+module "vpc" {
+  count    = var.enabled_modules["vpc"] ? 1 : 0
+  source   = "./modules/vpc"
+  vpc_name = "bukovel-fra1-vpc1"
+  region   = "fra1"
+  ip_range = "10.0.0.0/16"
+}
+module "kubernetes_resources" {
+  count               = var.enabled_modules["kubernetes_resources"] ? 1 : 0
+  depends_on          = [time_sleep.wait_for_cluster]
+  source              = "./modules/kubernetes_resources"
+  kubeconfig_filename = local_file.kubeconfig.filename
+  cluster_dependency  = null_resource.cluster_dependency
+}
 module "kubernetes" {
+  count                 = var.enabled_modules["kubernetes"] ? 1 : 0
   source                = "./modules/kubernetes"
   cluster_name          = "bukovel-k8s-cluster"
   region                = "fra1"
   do_kubernetes_version = "1.26.3-do.0"
   node_pool_name        = "worker-pool"
   node_size             = "s-1vcpu-2gb"
-  min_node_count        = 2
-  max_node_count        = 12
+  min_node_count        = 1
+  max_node_count        = 3
   registry_integration  = true
-  vpc_uuid              = module.vpc.vpc_id
+  vpc_uuid              = module.vpc[0].vpc_id
+  depends_on            = [module.vpc, module.container_registry]
 }
 
-module "vpc" {
-  source   = "./modules/vpc"
-  vpc_name = "bukovel-vpc"
-  region   = "fra1"
-  ip_range = "10.0.0.0/16"
+module "loadbalancer_letsencrypt_certificate" {
+  count            = var.enabled_modules["loadbalancer_letsencrypt_certificate"] ? 1 : 0
+  source           = "./modules/letsencrypt_certificate"
+  project_domains  = ["dowebapi.brutskiy.fun"]
+  certificate_name = "cert-dowebapi-brutskiy-fun"
+  depends_on       = [module.dns_records, time_sleep.wait_for_load_balancer]
 }
-module "loadbalancer" {
-  source            = "./modules/loadbalancer"
-  loadbalancer_name = "my-loadbalancer"
-  region            = "fra1"
-  vpc_uuid          = module.vpc.vpc_id
-  forwarding_rules = [
+module "loadbalancer_dns_records" {
+  count         = var.enabled_modules["loadbalancer_dns_records"] ? 1 : 0
+  source        = "./modules/dns_records"
+  domain_name   = "brutskiy.fun"
+  create_domain = false
+  depends_on    = [module.kubernetes_resources, data.digitalocean_loadbalancer.lb-k8s]
+  records = [
     {
-      entry_protocol  = "http"
-      entry_port      = 80
-      target_protocol = "http"
-      target_port     = 80
-      certificate_id  = ""
-      tls_passthrough = false
+      name  = "@"
+      type  = "A"
+      value = data.digitalocean_loadbalancer.lb-k8s.ip
+      ttl   = 300
     },
     {
-      entry_protocol  = "https"
-      entry_port      = 443
-      target_protocol = "http"
-      target_port     = 80
-      certificate_id  = module.letsencrypt_certificate.cert_id
-      tls_passthrough = false
+      name  = "dowebapi"
+      type  = "A"
+      value = data.digitalocean_loadbalancer.lb-k8s.ip
+      ttl   = 300
+  }, ]
+}
+module "dns_records" {
+  count         = var.enabled_modules["dns_records"] ? 1 : 0
+  source        = "./modules/dns_records"
+  domain_name   = "brutskiy.fun"
+  create_domain = true
+  records = [
+    {
+      name  = "bukovelwebapi"
+      type  = "A"
+      value = "95.216.47.151"
+      ttl   = 300
+    },
+    {
+      name  = "gitlab"
+      type  = "A"
+      value = "95.216.47.147"
+      ttl   = 300
+    },
+    {
+      name  = "www"
+      type  = "CNAME"
+      value = "@"
+      ttl   = 300
     },
   ]
 }
-
+module "letsencrypt_certificate" {
+  count            = var.enabled_modules["letsencrypt_certificate"] ? 1 : 0
+  source           = "./modules/letsencrypt_certificate"
+  project_domains  = ["dowebapi.brutskiy.fun"]
+  certificate_name = "bukovel-dowebapi-certificate"
+  depends_on       = [module.dns_records, module.loadbalancer_dns_records]
+}
 module "firewall" {
+  count                  = var.enabled_modules["firewall"] ? 1 : 0
   source                 = "./modules/firewall"
-  kubernetes_droplet_ids = module.kubernetes.node_pool_droplet_ids
+  kubernetes_droplet_ids = module.kubernetes[0].node_pool_droplet_ids
   firewall_name          = "k8s-firewall"
   inbound_rules = [
     {
@@ -73,43 +149,10 @@ module "firewall" {
     },
   ]
 }
-module "letsencrypt_certificate" {
-  source          = "./modules/letsencrypt_certificate"
-  project_domains = ["dowebapi.brutskiy.fun"]
-}
-
-module "postgres" {
-  source        = "./modules/postgres"
-  db_name       = "bukovel-postgres"
-  db_version    = "13"
-  db_size       = "db-s-1vcpu-1gb"
-  db_region     = "fra1"
-  db_node_count = 1
-  vpc_uuid      = module.vpc.vpc_id
-}
-
 module "container_registry" {
+  count             = var.enabled_modules["container_registry"] ? 1 : 0
   source            = "./modules/container_registry"
   registry_name     = "bukovel-registry"
   region            = "fra1"
   subscription_tier = "starter"
-}
-
-module "dns_records" {
-  source      = "./modules/dns_records"
-  domain_name = "dowebapi.brutskiy.fun"
-  records = [
-    {
-      name  = "@"
-      type  = "A"
-      value = module.loadbalancer.ip_address
-      ttl   = 300
-    },
-    {
-      name  = "www"
-      type  = "CNAME"
-      value = "@"
-      ttl   = 300
-    },
-  ]
 }

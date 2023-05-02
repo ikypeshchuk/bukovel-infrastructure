@@ -1,13 +1,11 @@
 variable "min_node_count" {
   description = "Minimum number of nodes in the node pool"
   type        = number
-  default     = 2
 }
 
 variable "max_node_count" {
   description = "Maximum number of nodes in the node pool"
   type        = number
-  default     = 12
 }
 variable "registry_integration" {
   description = "Enables or disables the DigitalOcean container registry integration for the cluster."

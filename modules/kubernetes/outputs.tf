@@ -14,3 +14,19 @@ output "kubeconfig" {
   description = "Kubeconfig file for the Kubernetes cluster"
   sensitive   = true
 }
+output "cluster_endpoint" {
+  value = digitalocean_kubernetes_cluster.production.endpoint
+}
+
+output "cluster_ca_certificate" {
+  value = digitalocean_kubernetes_cluster.production.kube_config.0.cluster_ca_certificate
+}
+
+output "kubeconfig_token" {
+  value = digitalocean_kubernetes_cluster.production.kube_config.0.token
+}
+output "kubeconfig_raw" {
+  description = "The raw Kubernetes config to be used by kubectl and other compatible tools."
+  value = digitalocean_kubernetes_cluster.production.kube_config.0.raw_config
+  sensitive   = true
+}
