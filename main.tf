@@ -25,22 +25,17 @@ resource "local_file" "kubeconfig" {
 resource "time_sleep" "wait_for_load_balancer" {
   depends_on = [module.kubernetes_resources.ingress_nginx_lb]
 
-  create_duration = "5m" # Adjust the duration as needed
+  create_duration = "3m" # Adjust the duration as needed
 }
 resource "null_resource" "cluster_dependency" {
   depends_on = [module.kubernetes]
 }
 resource "time_sleep" "wait_for_cluster" {
   depends_on      = [module.kubernetes]
-  create_duration = "5m" # Adjust the duration as needed
+  create_duration = "1m" # Adjust the duration as needed
 }
-data "digitalocean_loadbalancer" "lb-k8s" {
-  depends_on = [module.kubernetes_resources]
-  name       = "ingress-nginx-lb"
-}
-output "do_ip" {
-  value = data.digitalocean_loadbalancer.lb-k8s.ip
-}
+
+
 module "vpc" {
   count    = var.enabled_modules["vpc"] ? 1 : 0
   source   = "./modules/vpc"
@@ -81,18 +76,18 @@ module "loadbalancer_dns_records" {
   source        = "./modules/dns_records"
   domain_name   = "brutskiy.fun"
   create_domain = false
-  depends_on    = [module.kubernetes_resources, data.digitalocean_loadbalancer.lb-k8s]
+  depends_on    = [module.kubernetes_resources]
   records = [
     {
       name  = "@"
       type  = "A"
-      value = data.digitalocean_loadbalancer.lb-k8s.ip
+      value = try(module.kubernetes_resources.k8s_lb_ip, "127.0.0.1")
       ttl   = 300
     },
     {
       name  = "dowebapi"
       type  = "A"
-      value = data.digitalocean_loadbalancer.lb-k8s.ip
+      value = try(module.kubernetes_resources.k8s_lb_ip, "127.0.0.1")
       ttl   = 300
   }, ]
 }

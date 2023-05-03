@@ -11,10 +11,10 @@ variable "enabled_modules" {
     kubernetes                           = true
     dns_records                          = true
     container_registry                   = true
-    kubernetes_resources                 = false
+    kubernetes_resources                 = true
     vpc                                  = true
     loadbalancer_letsencrypt_certificate = false
-    loadbalancer_dns_records             = false
+    loadbalancer_dns_records             = true
     firewall                             = false
     letsencrypt_certificate              = false
   }
