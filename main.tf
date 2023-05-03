@@ -15,7 +15,10 @@ provider "digitalocean" {
   token = var.do_token
 }
 provider "kubernetes" {
-  config_path = local_file.kubeconfig.filename
+  config_path = local.kubeconfig_exists ? local_file.kubeconfig.filename : ""
+}
+locals {
+  kubeconfig_exists = fileexists("${path.module}/kubeconfig.yaml")
 }
 resource "local_file" "kubeconfig" {
   content    = module.kubernetes[0].kubeconfig_raw
@@ -34,8 +37,6 @@ resource "time_sleep" "wait_for_cluster" {
   depends_on      = [module.kubernetes]
   create_duration = "1m" # Adjust the duration as needed
 }
-
-
 module "vpc" {
   count    = var.enabled_modules["vpc"] ? 1 : 0
   source   = "./modules/vpc"
@@ -81,13 +82,13 @@ module "loadbalancer_dns_records" {
     {
       name  = "@"
       type  = "A"
-      value = try(module.kubernetes_resources.k8s_lb_ip, "127.0.0.1")
+      value = try(module.kubernetes_resources[0].load_balancer_ip, "127.0.0.1")
       ttl   = 300
     },
     {
       name  = "dowebapi"
       type  = "A"
-      value = try(module.kubernetes_resources.k8s_lb_ip, "127.0.0.1")
+      value = try(module.kubernetes_resources[0].load_balancer_ip, "127.0.0.1")
       ttl   = 300
   }, ]
 }
