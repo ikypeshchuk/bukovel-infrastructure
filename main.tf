@@ -68,8 +68,8 @@ module "kubernetes" {
 module "loadbalancer_letsencrypt_certificate" {
   count            = var.enabled_modules["loadbalancer_letsencrypt_certificate"] ? 1 : 0
   source           = "./modules/letsencrypt_certificate"
-  project_domains  = ["dowebapi.brutskiy.fun"]
-  certificate_name = "cert-dowebapi-brutskiy-fun"
+  project_domains  = ["doapi.brutskiy.fun"]
+  certificate_name = "cert-doapi-brutskiy-fun"
   depends_on       = [module.dns_records, time_sleep.wait_for_load_balancer]
 }
 module "loadbalancer_dns_records" {
@@ -86,7 +86,7 @@ module "loadbalancer_dns_records" {
       ttl   = 300
     },
     {
-      name  = "dowebapi"
+      name  = "doapi"
       type  = "A"
       value = try(module.kubernetes_resources[0].load_balancer_ip, "127.0.0.1")
       ttl   = 300
