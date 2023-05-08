@@ -65,6 +65,24 @@ resource "null_resource" "wait_for_ip" {
   }
 }
 
+resource "null_resource" "configure_kubectl" {
+  depends_on = [null_resource.wait_for_credentials] # Adjust this dependency to match the resource that generates your kubeconfig.yaml file.
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      # Set the KUBECONFIG environment variable
+      export KUBECONFIG=kubeconfig.yaml
+
+      # OR Merge the new kubeconfig with an existing one (assuming you have kubectl and yq installed)
+      if [ -f "$HOME/.kube/config" ]; then
+        yq e -i '. as $item ireduce ({}; . * $item)' "$HOME/.kube/config" "kubeconfig.yaml"
+      else
+        mkdir -p "$HOME/.kube"
+        cp "kubeconfig.yaml" "$HOME/.kube/config"
+      fi
+    EOT
+  }
+}
 
 
 

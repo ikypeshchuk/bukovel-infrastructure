@@ -21,14 +21,15 @@ locals {
   kubeconfig_exists = fileexists("${path.module}/kubeconfig.yaml")
 }
 resource "local_file" "kubeconfig" {
-  content    = module.kubernetes[0].kubeconfig_raw
+  content    = length(module.kubernetes) > 0 ? module.kubernetes[0].kubeconfig_raw : ""
   filename   = "${path.module}/kubeconfig.yaml"
   depends_on = [module.kubernetes]
 }
+
 resource "time_sleep" "wait_for_load_balancer" {
   depends_on = [module.kubernetes_resources.ingress_nginx_lb]
 
-  create_duration = "3m" # Adjust the duration as needed
+  create_duration = "1m" # Adjust the duration as needed
 }
 resource "null_resource" "cluster_dependency" {
   depends_on = [module.kubernetes]
@@ -77,7 +78,7 @@ module "loadbalancer_dns_records" {
   source        = "./modules/dns_records"
   domain_name   = "brutskiy.fun"
   create_domain = false
-  depends_on    = [module.kubernetes_resources]
+  depends_on    = [module.kubernetes_resources, time_sleep.wait_for_load_balancer]
   records = [
     {
       name  = "@"
@@ -149,4 +150,17 @@ module "container_registry" {
   registry_name     = "bukovel-registry"
   region            = "fra1"
   subscription_tier = "starter"
+}
+module "local_runner" {
+  count                = var.enabled_modules["local_runner"] ? 1 : 0
+  source               = "./modules/local_runner"
+  name                 = "local-runner"
+  region               = "fra1"
+  size                 = "s-1vcpu-2gb"
+  image                = "ubuntu-22-04-x64"
+  ssh_keys             = [var.ssh_key_fingerprint]
+  private_ssh_key_path = var.private_ssh_key_path
+  github_runner_token  = var.github_runner_token
+  github_repo_url      = var.github_repo_url
+  vpc_uuid             = module.vpc[0].vpc_id
 }
