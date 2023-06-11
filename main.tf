@@ -106,51 +106,52 @@ module "loadbalancer_letsencrypt_certificate" {
 }
 
 module "loadbalancer_dns_records" {
-  count         = var.enabled_modules["loadbalancer_dns_records"] ? 1 : 0
+  count         = length(var.domains)
   source        = "./modules/dns_records"
-  domain_name   = "brutskiy.fun"
+  domain_name   = var.domains[count.index]["domain"]
   create_domain = false
   depends_on    = [module.kubernetes_resources, time_sleep.wait_for_load_balancer]
-  records = [
-    {
-      name  = "@"
-      type  = "A"
-      value = try(module.kubernetes_resources[0].load_balancer_ip, "127.0.0.1")
-      ttl   = 300
-    },
-    {
-      name  = "doapi"
-      type  = "A"
-      value = try(module.kubernetes_resources[0].load_balancer_ip, "127.0.0.1")
-      ttl   = 300
-  }, ]
+  records = concat(
+    [
+      for record in var.domains[count.index]["records"]:
+      {
+        name  = record["name"]
+        type  = "A"
+        value = try(module.kubernetes_resources[0].load_balancer_ip, "127.0.0.1")
+        ttl   = 300
+      }
+    ],
+    [
+      {
+        name  = "@"
+        type  = "A"
+        value = try(module.kubernetes_resources[0].load_balancer_ip, "127.0.0.1")
+        ttl   = 300
+      }
+    ]
+  )
 }
 
 module "dns_records" {
-  count         = var.enabled_modules["dns_records"] ? 1 : 0
+  count         = length(var.domains)
   source        = "./modules/dns_records"
-  domain_name   = "brutskiy.fun"
+  domain_name   = var.domains[count.index]["domain"]
   create_domain = true
-  records = [
-    {
-      name  = "bukovelwebapi"
-      type  = "A"
-      value = "95.216.47.151"
-      ttl   = 300
-    },
-    {
-      name  = "gitlab"
-      type  = "A"
-      value = "95.216.47.147"
-      ttl   = 300
-    },
-    {
-      name  = "www"
-      type  = "CNAME"
-      value = "@"
-      ttl   = 300
-    },
-  ]
+  records = concat(
+    [
+      for record in var.domains[count.index]["records"]:
+      record
+    ],
+    [
+      {
+        name  = "www"
+        type  = "CNAME"
+        value = "@"
+        ttl   = 300
+      },
+    ]
+  )
+  depends_on = [module.kubernetes]
 }
 
 module "letsencrypt_certificate" {

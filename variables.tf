@@ -40,15 +40,29 @@ variable "enabled_modules" {
   type        = map(bool)
   default = {
     kubernetes                           = false # 1st phase. Enable Kubernetes module 
-    dns_records                          = false # 1st phase. Enable DNS records module 
     container_registry                   = true # 1st phase. Enable Container Registry module
     firewall                             = false # 1st phase Enable Firewall module
     vpc                                  = false  # 1st phase, Enable VPC module 
     postgresql                           = false # 2rd phase Enable Kubernetes resources module
     kubernetes_resources                 = false # 3rd phase Enable Kubernetes resources module
-    loadbalancer_dns_records             = false # 4rd phase Enable DNS records module
     loadbalancer_letsencrypt_certificate = false # 5rd phase Enable Letsencrypt certificate module
     letsencrypt_certificate              = false # 5rd phase Enable Letsencrypt certificate module
     local_runner                         = true  # 6rd phase Enable Local runner module
   }
+}
+
+variable "domains" {
+  default = [
+    {
+      domain = "your-domain.com"
+      records = [
+        {
+          name  = "your-sub-domain"
+          type  = "A"
+          value = "your-ip-addres"
+          ttl   = 300
+        }
+      ]
+    }
+  ]
 }
