@@ -42,5 +42,5 @@ variable "do_kubernetes_version" {
 variable "cluster_name" {
   description = "The name of the Kubernetes cluster"
   type        = string
-  default     = "bukovel-k8s-cluster"
+  default     = "k8s-cluster"
 }

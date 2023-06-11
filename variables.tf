@@ -3,6 +3,7 @@ variable "do_token" {
   type        = string
   sensitive   = false
 }
+
 variable "ssh_key_fingerprint" {
   description = "The fingerprint of the SSH key to be used for the local runner"
   type        = string
@@ -23,6 +24,17 @@ variable "github_repo_url" {
   description = "The GitHub repository URL where the local runner will be registered"
   type        = string
 }
+
+variable "conf" {
+  description = "Common Cluster Configuration"
+  type        = map(string)
+  default = {
+    name       = "bukovel"
+    enviroment = "dev"
+    region     = "fra1"
+  }
+}
+
 variable "enabled_modules" {
   description = "Map of module names and their enabled status"
   type        = map(bool)
@@ -32,10 +44,11 @@ variable "enabled_modules" {
     container_registry                   = true # 1st phase. Enable Container Registry module
     firewall                             = false # 1st phase Enable Firewall module
     vpc                                  = false  # 1st phase, Enable VPC module 
-    kubernetes_resources                 = false # 2rd phase Enable Kubernetes resources module
-    loadbalancer_dns_records             = false # 3rd phase Enable DNS records module 
-    loadbalancer_letsencrypt_certificate = false # 4rd phase Enable Letsencrypt certificate module 
-    letsencrypt_certificate              = false # 4rd phase Enable Letsencrypt certificate module 
-    local_runner                         = true  # 5rd phase Enable Local runner module
+    postgresql                           = false # 2rd phase Enable Kubernetes resources module
+    kubernetes_resources                 = false # 3rd phase Enable Kubernetes resources module
+    loadbalancer_dns_records             = false # 4rd phase Enable DNS records module
+    loadbalancer_letsencrypt_certificate = false # 5rd phase Enable Letsencrypt certificate module
+    letsencrypt_certificate              = false # 5rd phase Enable Letsencrypt certificate module
+    local_runner                         = true  # 6rd phase Enable Local runner module
   }
 }
